@@ -19,6 +19,7 @@ passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 pydantic-settings = "^2.7.1"
 fastapi-mail = "^1.4.2"
 slowapi = "^0.1.9"
+cloudinary = "^1.42.1"
 
 
 [build-system]

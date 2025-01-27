@@ -125,6 +125,76 @@ origins = [ "<http://localhost:3000>" ]
 app.add_middleware( CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"],)
 ```
 
+## Реалізуємо можливість оновлення аватара користувача
+
+Використаємо сервіс Cloudinary.
+Реєструємось на сервіс [Cloudinary](https://cloudinary.com/).
+Отримані ключі записуємо в [.env](.env)
+
+```ini
+# Cloudinary
+# CLOUDINARY_NAME
+CLD_NAME=name
+# CLOUDINARY_API_KEY
+CLD_API_KEY=12345678
+# CLOUDINARY_API_SECRET
+CLD_API_SECRET=secret
+```
+
+Розширимо наш клас конфігурації `Settingns` новими змінними [src/conf/config.py](src/conf/config.py).
+
+```Py
+class Settings(BaseSettings):
+    DB_URL: str
+    JWT_SECRET: str
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRATION_SECONDS: int = 3600
+
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: str
+    MAIL_PORT: int
+    MAIL_SERVER: str
+    MAIL_FROM_NAME: str
+    MAIL_STARTTLS: bool = False
+    MAIL_SSL_TLS: bool = True
+    USE_CREDENTIALS: bool = True
+    VALIDATE_CERTS: bool = True
+    TEMPLATE_FOLDER: Path = Path(__file__).parent.parent / "services" / "templates"
+
+    CLD_NAME: str
+    CLD_API_KEY: int
+    CLD_API_SECRET: str
+
+    model_config = ConfigDict(
+        extra="ignore", env_file=".env", env_file_encoding="utf-8", case_sensitive=True
+    )
+```
+
+Визначимо новий маршрут для завантаження аватарок `/avatar` і помістимо його у файл [src/api/users.py](src/api/users.py)
+
+Опишемо сервіс завантаження файлу у хмару `UploadFileService`, який помістимо у [src/services/upload_file.py](src/services/upload_file.py)
+
+Додамо наступний метод у сервіс користувача `UserService` з [src/services/users.py](src/services/users.py):
+
+```Py
+    async def update_avatar_url(self, email: str, url: str):
+        return await self.repository.update_avatar_url(email, url)
+```
+
+Далі додамо метод `update_avatar_url` у репозиторій користувача [src/repository/users.py](src/repository/users.py), який оновлює аватар користувача в базі даних:
+
+```Py
+    async def update_avatar_url(self, email: str, url: str) -> User:
+        user = await self.get_user_by_email(email)
+        user.avatar = url
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+```
+
+Нові аватари завантажуються на Cloudinary і посилання на зображення у хмарі записується в базу даних `users.avatar`
+
 ## Запуск
 
 Щоб запустити програму FastAPI для розробки, можна використати `fastapi dev` команду:
