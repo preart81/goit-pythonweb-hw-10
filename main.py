@@ -1,15 +1,29 @@
 """ Main file to run the FastAPI application. """
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
-from src.api import contacts, utils
+from src.api import auth, contacts, users, utils
 from src.conf import messages
+from src.services.limiter import limiter
 
 app = FastAPI()
-
+app.state.limiter = limiter
 app.include_router(utils.router, prefix="/api")
 app.include_router(contacts.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"error": "Перевищено ліміт запитів. Спробуйте пізніше."},
+    )
 
 
 @app.get("/")
