@@ -39,7 +39,7 @@ src\database\models.py
 - створюємо репозиторій для users
   [src/repository/users.py](src/repository/users.py)
 
-## Сервіс автентифікації та користувача
+## Додаємо сервіс автентифікації та користувача
 
 Для правильної роботи нашого сервісу необхідно встановити наступні пакети:
 
@@ -52,7 +52,7 @@ src\database\models.py
 - додаємо код сервісу [src/services/users.py](src/services/users.py)
 - додаємо код сервісу [src/services/auth.py](src/services/auth.py)
 
-## Маршрути автентифікації та користувача
+## Додаємо маршрути автентифікації та користувача
 
 - Створимо маршрути [src/api/auth.py](src/api/auth.py) та додамо:
   - `/api/auth/register` — маршрут для реєстрації користувача;
@@ -74,6 +74,72 @@ src\database\models.py
 
 - додамо в репозиторій [src/repository/contacts.py](src/repository/contacts.py) додатковий параметр user: User. Це дозволяє нам виконувати операції в контексті автентифікованого користувача. У кожному методі ми оновили SQLAlchemy-запити, щоб вони враховували контекст користувача. Це гарантує, що користувачі можуть взаємодіяти лише зі своїми конатктами.
 
-[src/services/email.py](src/services/email.py)
+## Додаємо ratelimit
 
--
+Обмежимо кількість запитів до маршруту користувача `/me`
+
+- додаємо ліміти в [src/api/users.py](src/api/users.py) і огортаємо /me декоратором
+
+  ```py
+  limiter = Limiter(key_func=get_remote_address)
+
+  @router.get("/me", response_model=User)
+  @limiter.limit("5/minute")
+  async def me(request: Request, user: User = Depends(get_current_user)):
+      return user
+  ```
+
+- додаємо обробник винятків у [main.py](main.py)
+  ```Py
+  @app.exception_handler(RateLimitExceeded)
+  async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+      return JSONResponse(
+          status_code=429,
+          content={"error": "Перевищено ліміт запитів. Спробуйте пізніше."},
+      )
+  ```
+
+## Вмикаємо CORS
+
+Для використання CORS у FastAPI ми імпортуємо `CORSMiddleware` з пакета `fastapi`:
+
+```Py
+from fastapi import FastAPIfrom fastapi.middleware.cors import CORSMiddleware
+```
+
+Створюємо екземпляр застосунку:
+
+```Py
+app = FastAPI()
+```
+
+Визначаємо список доменів, які можуть надсилати запити до нашого API:
+
+```Py
+origins = [ "<http://localhost:3000>" ]
+```
+
+Додаємо `CORSMiddleware` у наш застосунок:
+
+```Py
+app.add_middleware( CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"],)
+```
+
+## Запуск
+
+Щоб запустити програму FastAPI для розробки, можна використати `fastapi dev` команду:
+
+    fastapi dev main.py
+
+Або, щоб більш гнучко налаштовувати запуск, можна виконати наступну команду, щоб запустити сервер `FastAPI` з `uvicorn`:
+
+    uvicorn main:app --host localhost --port 8000 --reload
+
+Тут параметри команди мають наступне значення:
+
+- `uvicorn` — високопродуктивний вебсервер ASGI;
+- `main` — файл `main.py`;
+- `app` — об'єкт, повернений після запиту `app = FastAPI()`;
+- `-host` — дозволяє прив'язати сокет до хоста. Значення за замовчуванням — `127.0.0.1`;
+- `-port` — дозволяє прив'язати сокет до певного порту. За замовчуванням використовується значення `8000`;
+- `-reload` — забезпечує гаряче перезавантаження сервера під час розробки.

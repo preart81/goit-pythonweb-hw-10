@@ -95,6 +95,6 @@ class ContactRepository:
                 ).between(today, future_date),
             ),
         )
-        print((stmt))
+        # print((stmt))
         contacts = await self.db.execute(stmt)
         return contacts.scalars().all()
